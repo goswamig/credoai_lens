@@ -63,6 +63,7 @@ class FairnessModule(CredoModule):
         self.fairness_prob_metrics = None
         self.metric_conversions = None
         self.failed_metrics = None
+        self.metric_frames = {}
         self.update_metrics(metrics)
 
     def run(self, method='between_groups'):
@@ -153,7 +154,7 @@ class FairnessModule(CredoModule):
          self.fairness_prob_metrics,
          self.metric_conversions,
          self.failed_metrics) = self._process_metrics(self.metrics)
-        self._setup_metric_frames()
+        self.metric_frames = self._setup_metric_frames()
 
     def get_df(self):
         """Return dataframe of input arrays
@@ -314,15 +315,16 @@ class FairnessModule(CredoModule):
                            sensitive_features=self.sensitive_features)
     
     def _setup_metric_frames(self):
-        self.metric_frames = {}
+        metric_frames = {}
         if self.y_pred is not None and self.performance_metrics:
-            self.metric_frames['pred'] = self._create_metric_frame(
+            metric_frames['pred'] = self._create_metric_frame(
                 self.performance_metrics, self.y_pred)
         # for metrics that require the probabilities
         self.prob_metric_frame = None
         if self.y_prob is not None and self.prob_metrics:
-            self.metric_frames['prob'] = self._create_metric_frame(
+            metric_frames['prob'] = self._create_metric_frame(
                 self.prob_metrics, self.y_prob)
+        return metric_frames
             
     def _validate_inputs(self):
         check_consistent_length(self.y_true, self.y_pred,

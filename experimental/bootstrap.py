@@ -72,7 +72,7 @@ class Sampler():
             return np.array([fun(s) for s in samples['y_pred'].T])
 
     def create_samples(self, array_dict, n_rep=1000, sample_size=None):
-        """[summary]
+        """Samples a dictionary of arrays
 
         Parameters
         ----------

@@ -153,9 +153,9 @@ class Sampler():
 
 class RiskQuestionnare():
     def __init__(self, 
-            big_deal=.001,
+            big_deal=.01,
             medium_deal = .01,
-            small_deal = .05
+            small_deal = .01
         ):
         self.deals = {
             'big': big_deal,
@@ -171,7 +171,7 @@ class RiskQuestionnare():
 
     def run(self):
         base = .8
-        sample_sizes = {}
+        output = {}
         for deal, important_p_val in self.deals.items():
             sig_val = stats.norm.ppf(1-important_p_val/2) # zval equal to pval of .05
 
@@ -185,5 +185,6 @@ class RiskQuestionnare():
             n_down = self._find_n(base-significant_accuracy_diff, base, sig_val)
             average_n = (n_up+n_down)/2
             print(f'Number of people to use for this test: [{n_down}, {n_up}]\nAverage: {average_n}')
-            sample_sizes[deal] = int(average_n)
-        return sample_sizes
+            sample_size = int(average_n)
+            output[deal] = {'sample_size': sample_size, 'thresh': important_p_val}
+        return output

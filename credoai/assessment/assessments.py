@@ -45,7 +45,7 @@ class PerformanceAssessment(CredoAssessment):
             )
         )
     
-    def init_module(self, *, model, data, metrics):
+    def init_module(self, *, model, data, metrics, ignore_sensitive=True):
         """Initializes the assessment module
 
         Transforms CredoModel and CredoData into the proper form
@@ -63,6 +63,10 @@ class PerformanceAssessment(CredoAssessment):
             Note for performance parity metrics like 
             "false negative rate parity" just list "false negative rate". Parity metrics
             are calculated automatically if the performance metric is supplied
+        ignore_sensitive : bool
+            Whether to ignore the sensitive_feature of CredoData (thus preventing calculation
+            of disaggregated performance). Generally used when Lens is also running 
+            Fairness Assessment, which also calculates disaggregated performance.
 
         Example
         ---------
@@ -81,13 +85,14 @@ class PerformanceAssessment(CredoAssessment):
             y_prob = model.prob_fun(data.X)
         except AttributeError:
             y_prob = None
-            
+        
+        sensitive_features = None if ignore_sensitive else data.sensitive_features
         module = self.module(
             metrics,
             data.y,
             y_pred,
             y_prob,
-            data.sensitive_features)
+            sensitive_features)
         self.initialized_module = module
     
 

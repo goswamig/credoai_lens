@@ -117,7 +117,7 @@ class Lens:
 
         # set up reporter objects
         self.report = None
-        self.reporters = {}
+        self.reporters = []
 
         # if data is defined and dev mode, convert data
         self._apply_dev_mode(self.dev_mode)
@@ -169,7 +169,7 @@ class Lens:
             )
         if not self.reporters:
             self._create_reporters()
-        self.report = MainReport(f"Assessment Report", self.reporters.values())
+        self.report = MainReport(f"Assessment Report", self.reporters)
         self.report.create_report(self)
         return self
 
@@ -257,11 +257,13 @@ class Lens:
         assessments = wrap_list(assessments)
         if not self.reporters:
             self._create_reporters()
-        for name, reporter in self.reporters.items():
+        for reporter in self.reporters:
+            name = reporter.assessment.name
             if assessments and name not in assessments:
                 continue
             reporter.display_results_tables()
             reporter.plot_results()
+        return self
 
     def _apply_dev_mode(self, dev_mode):
         if dev_mode:
@@ -280,7 +282,7 @@ class Lens:
                 logging.info(
                     f"Reporter creating notebook for assessment-{name}")
                 reporter.create_notebook()
-                self.reporters[name] = reporter
+                self.reporters.append(reporter)
             else:
                 logging.info(f"No reporter found for assessment-{name}")
 
@@ -289,13 +291,8 @@ class Lens:
             dataset_id = self.gov.dataset_id
         elif assessment.data_name == self.training_dataset.name:
             dataset_id = self.gov.training_dataset_id
-        return {'process': f'Lens-{assessment.name}',
-                'model_label': assessment.model_name,
-                'dataset_label': assessment.data_name,
-                'dataset_id': dataset_id,
-                'user_id': self.user_id,
-                'assessment': assessment.name,
-                'lens_version': f'Lens-v{__version__}'}
+        return {'process': f'Lens-v{__version__}_{assessment.name}',
+                'dataset_id': dataset_id}
 
     def _get_credo_destination(self, to_model=True):
         """Get destination for export and ensure all artifacts are registered"""
@@ -307,11 +304,15 @@ class Lens:
 
     def _init_assessments(self):
         """Initializes modules in each assessment"""
-        for dataset_type, dataset in self.get_datasets().items():
-            logging.info(
-                f"Initializing assessments for {dataset_type} dataset: {dataset.name}")
-            assessments = self.assessments[dataset_type].values()
-            for assessment in assessments:
+        datasets = self.get_datasets()
+        for dataset_type, assessments in self.get_assessments().items():
+            dataset = datasets.get(dataset_type)
+            if dataset:
+                logging.info(
+                    f"Initializing assessments for {dataset_type} dataset: {dataset.name}")
+            else:
+                logging.info(f"Initializing assessments for model without dataset")
+            for assessment in assessments.values():
                 kwargs = deepcopy(self.spec.get(assessment.name, {}))
                 reqs = assessment.get_requirements()
                 if reqs['model_requirements']:
@@ -322,7 +323,7 @@ class Lens:
                     assessment.init_module(**kwargs)
                 except:
                     raise ValidationError(f"Assessment ({assessment.get_name()}) could not be initialized."
-                                          "Ensure the assessment spec is passing the required parameters"
+                                          " Ensure the assessment spec is passing the required parameters"
                                           )
 
     def _prepare_results(self, assessment, **kwargs):
@@ -363,19 +364,25 @@ class Lens:
 
     def _select_assessments(self, candidate_assessments=None):
         selected_assessments = {}
+        logging.info("Automatically Selected Assessments for Model without data\n")
+        model_assessments = get_usable_assessments(self.model, None, candidate_assessments)
+        if model_assessments:
+            assessment_text = f"Selected assessments...\n--" + '\n--'.join(model_assessments.keys())
+            logging.info(assessment_text)
+            selected_assessments['no_data'] = model_assessments
         # get assesments for each assessment dataset
         for dataset_type, dataset in self.get_datasets().items():
+            artifact_text = f"{dataset_type} dataset: {dataset.name}"
             if dataset == self.training_dataset:
                 model = None
             else:
                 model = self.model
-            usable_assessments = get_usable_assessments(
-                model, dataset, candidate_assessments)
-            artifact_text = f"{dataset_type} dataset: {dataset.name}"
             if model:
                 artifact_text = f"model: {model.name} and {artifact_text}"
-            assessment_text = f"Automatically Selected Assessments for {artifact_text}\n--" + \
-                '\n--'.join(usable_assessments.keys())
+            logging.info(f"Automatically Selected Assessments for {artifact_text}\n--")
+            usable_assessments = get_usable_assessments(
+                model, dataset, candidate_assessments)
+            assessment_text = 'Selected assessments...\n--' + '\n--'.join(usable_assessments.keys())
             logging.info(assessment_text)
             selected_assessments[dataset_type] = usable_assessments
         return selected_assessments

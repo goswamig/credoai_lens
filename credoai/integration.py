@@ -10,8 +10,9 @@ from credoai.utils.credo_api_utils import (get_assessment_plan,
                                            post_assessment,
                                            register_dataset, 
                                            register_model,
-                                           register_model_to_use_case,
-                                           register_dataset_to_model)
+                                           register_model_to_usecase,
+                                           register_dataset_to_model,
+                                           register_dataset_to_model_usecase)
 import base64
 import credoai
 import json
@@ -31,7 +32,8 @@ META = {
 class Record:
     def __init__(self, json_header, **metadata):
         self.json_header = json_header
-        self.metadata = metadata
+        # remove Nones from metadata
+        self.metadata = {k:v for k, v in metadata.items() if v!='NA'}
         self.creation_time = datetime.now().isoformat()
 
     def struct(self):
@@ -62,7 +64,8 @@ class Metric(Record):
         String reflecting the process used to create the metric. E.g.,
         name of a particular Lens assessment, or link to code.
     metadata : dict, optional
-        Arbitrary keyword arguments to append to metric as metadata
+        Arbitrary keyword arguments to append to metric as metadata. These will be
+        displayed in the governance app
 
     Example
     ---------
@@ -93,7 +96,7 @@ class Metric(Record):
             'value': self.value,
             'dataset_id': self.dataset_id,
             'process': self.process,
-            'metadata': self.metadata,
+            'labels': self.metadata,
             'value_updated_at': self.creation_time,
         }
 
@@ -283,7 +286,7 @@ def prepare_assessment_payload(assessment_results, report=None, assessed_at=None
     
     payload = {"assessed_at": assessed_at or datetime.now().isoformat(),
                "metrics": assessment_records,
-               "charts": None,
+               "charts": [],
                "report": report_payload,
                "$type": 'string'}
     return payload

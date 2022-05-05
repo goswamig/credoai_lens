@@ -150,7 +150,8 @@ class DatasetFairness(CredoModule):
         """Determines redundant encoding
 
         A model is trained on the features to predict the sensitive attribute.
-        The score is cross-validated ROC-AUC score.
+        The score, called "sensitive-feature-prediction-score" is a cross-validated ROC-AUC score. 
+        We scale the score from typical ROC range of 0.5-1 to 0-1.
         It quantifies the performance of this prediction. 
         A high score means the data collectively serves as a proxy.
 
@@ -187,7 +188,7 @@ class DatasetFairness(CredoModule):
         col_names = ColumnTransformerUtil.get_ct_feature_names(preprocessor)
         feature_importances = pd.Series(model.feature_importances_, 
             index=col_names).sort_values(ascending=False)
-        results['sensitive_feature_prediction_score'] = cv_results.mean()
+        results['sensitive_feature_prediction_score'] = max(cv_results.mean() * 2 - 1, 0) # move to 0-1 range
         results['sensitive_feature_prediction_feature_importances'] = feature_importances.to_dict()
 
         return results
@@ -287,7 +288,7 @@ class DatasetFairness(CredoModule):
                 discrete_features=discrete_features,
                 random_state=42,
             )
-            ref = mutual_info_regression(self.sensitive_feature.values[:,None], 
+            ref = mutual_info_regression(self.sensitive_features.values[:,None], 
                                          self.sensitive_features,
                                          random_state=42)[0]
 

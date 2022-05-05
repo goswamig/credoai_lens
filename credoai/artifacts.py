@@ -22,6 +22,7 @@
 from absl import logging
 from copy import deepcopy
 from credoai.metrics.metrics import find_metrics
+from credoai.utils.constants import RISK_ISSUE_MAPPING
 from credoai.utils.common import (IntegrationError, ValidationError, 
                                   json_dumps, raise_or_warn, flatten_list)
 from credoai.utils.credo_api_utils import (get_dataset_by_name, 
@@ -95,18 +96,25 @@ class CredoGovernance:
             self.retrieve_assessment_spec()
         spec = {}
         risk_spec = self.assessment_spec
-        metrics = flatten_list([[m['type'] for m in metrics] for metrics in risk_spec.values()])
-        passed_metrics = []
-        for m in metrics:
-            found = bool(find_metrics(m))
-            if not found:
-                logging.warning(f"Metric ({m}) is defined in the assessment spec but is not defined by Credo AI.\n"
-                                    "Ensure you create a custom Metric (credoai.metrics.Metric) and add it to the\n"
-                                    "assessment spec passed to lens")
-            else:
-                passed_metrics.append(m)
-        spec['metrics'] = passed_metrics
-        return {"Fairness": spec, "Performance": deepcopy(spec)}
+        missing_metrics = []
+        for risk_issue, plan in risk_spec.items():
+            metrics = [m['type'] for m in plan]
+            passed_metrics = []
+            for m in metrics:
+                found = bool(find_metrics(m))
+                if not found:
+                    missing_metrics.append(m)
+                else:
+                    passed_metrics.append(m)
+            if risk_issue in RISK_ISSUE_MAPPING:
+                spec[RISK_ISSUE_MAPPING[risk_issue]] = {'metrics': passed_metrics}
+        # alert about missing metrics
+        for m in missing_metrics:
+            logging.warning(f"Metric ({m}) is defined in the assessment spec but is not defined by Credo AI.\n"
+                            "Ensure you create a custom Metric (credoai.metrics.Metric) and add it to the\n"
+                            "assessment spec passed to lens")
+        return spec
+    
 
     def get_info(self):
         """Return Credo AI Governance IDs"""
@@ -283,6 +291,10 @@ class CredoGovernance:
                           f"The dataset ({dataset_name}) is already registered.",
                           f"The dataset ({dataset_name}) is already registered. Using registered dataset",
                           self.warning_level)
+        if not register_as_training and self.model_id and self.use_case_id:
+            ci.register_dataset_to_model_usecase(
+                use_case_id=self.use_case_id, model_id=self.model_id, dataset_id=self.dataset_id
+            )
         if register_as_training and self.model_id and self.training_dataset_id:
             logging.info(f"Registering dataset ({dataset_name}) to model ({self.model_id})")
             ci.register_dataset_to_model(self.model_id, self.training_dataset_id)
@@ -308,7 +320,7 @@ class CredoGovernance:
                           self.warning_level)
         if self.use_case_id:
             logging.info(f"Registering model ({model_name}) to Use Case ({self.use_case_id})")
-            ci.register_model_to_use_case(self.use_case_id, self.model_id)
+            ci.register_model_to_usecase(self.use_case_id, self.model_id)
 
     def _validate_ids(self):
         ids = self.get_info()
@@ -339,7 +351,7 @@ class CredoModel:
     agnostic to framework. As long as the functions serve the needs of the
     assessments, they'll work.
 
-    E.g. {'prob_fun': model.predict}
+    E.g. {'predict': model.predict}
 
     The model_config can also be inferred automatically, from well-known packages
     (call CredoModel.supported_frameworks for a list.) If supported, a model
@@ -362,7 +374,7 @@ class CredoModel:
         by CredoModel's automated inference. model_config is a more
         flexible and reliable method of interaction, by default None
     model_config : dict, optional
-        dictionary containing mappings between CredoModel function names (e.g., "prob_fun")
+        dictionary containing mappings between CredoModel function names (e.g., "predict")
         and functions (e.g., "model.predict"), by default None
     """
 
@@ -375,7 +387,7 @@ class CredoModel:
         self.name = name
         self.config = {}
         assert model is not None or model_config is not None
-        if model is not None:
+        if model is not None and model_config is None:
             self._init_config(model)
         if model_config is not None:
             self.config.update(model_config)
@@ -406,17 +418,18 @@ class CredoModel:
         return self._sklearn_style_config(model)
 
     def _sklearn_style_config(self, model):
+        config = {'predict': model.predict}
         # if binary classification, only return
         # the positive classes probabilities by default
-        if len(model.classes_) == 2:
-            def prob_fun(X): return model.predict_proba(X)[:, 1]
-        else:
-            prob_fun = model.predict_proba
+        try:
+            if len(model.classes_) == 2:
+                def predict_proba(X): return model.predict_proba(X)[:, 1]
+            else:
+                predict_proba = model.predict_proba
 
-        config = {
-            'pred_fun': model.predict,
-            'prob_fun': prob_fun
-        }
+            config['predict_proba'] = predict_proba
+        except AttributeError:
+            pass
         return config
 
     def _get_model_type(self, model):

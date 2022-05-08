@@ -4,14 +4,11 @@ Module containing all CredoAssessmsents
 
 from credoai.assessment.credo_assessment import CredoAssessment, AssessmentRequirements
 from credoai.data.utils import get_data_path
-from credoai.reporting import (FairnessReporter, BinaryClassificationReporter,
-                              NLPGeneratorAnalyzerReporter, DatasetFairnessReporter, RegressionReporter)
 from sklearn.utils.multiclass import type_of_target
-from credoai.reporting.dataset_profiling import DatasetProfilingReporter
-
 from credoai.utils import InstallationError
 import credoai.utils as cutils
 import credoai.modules as mod
+import credoai.reporting as rep
 import sys, inspect
 
 class PerformanceAssessment(CredoAssessment):
@@ -174,11 +171,11 @@ class FairnessAssessment(CredoAssessment):
     
     def get_reporter(self):
         if type_of_target(self.initialized_module.y_true) == 'binary':
-            return BinaryClassificationReporter(self)
+            return rep.BinaryClassificationReporter(self)
         elif type_of_target(self.initialized_module.y_true) == 'continuous':
-            return RegressionReporter(self)
+            return rep.RegressionReporter(self)
         else:
-            return FairnessReporter(self)
+            return rep.FairnessReporter(self)
 
 class NLPEmbeddingBiasAssessment(CredoAssessment):
     """
@@ -292,7 +289,7 @@ class NLPGeneratorAssessment(CredoAssessment):
         self.initialized_module = module
     
     def get_reporter(self):
-        return NLPGeneratorAnalyzerReporter(self)
+        return rep.NLPGeneratorAnalyzerReporter(self)
 
 class DatasetFairnessAssessment(CredoAssessment):
     """
@@ -331,7 +328,7 @@ class DatasetFairnessAssessment(CredoAssessment):
             data.categorical_features_keys)
 
     def get_reporter(self):
-        return DatasetFairnessReporter(self)
+        return rep.DatasetFairnessReporter(self)
 
 class DatasetProfilingAssessment(CredoAssessment):
     """
@@ -360,7 +357,32 @@ class DatasetProfilingAssessment(CredoAssessment):
             data.y)
 
     def get_reporter(self):
-        return DatasetProfilingReporter(self)
+        return rep.DatasetProfilingReporter(self)
+
+class ShapAssessment(CredoAssessment):
+    """
+
+    Modules
+    -------
+    * credoai.modules.explainability_shap
+
+    """
+    def __init__(self):
+        super().__init__(
+            'ShapExplainer', 
+            mod.ShapExplainer,
+            AssessmentRequirements(
+                model_requirements=['model'],
+                data_requirements=['X']
+            )
+        )
+    
+    def init_module(self, *, model, data):
+        super().init_module(model=model, data=data)
+        self.initialized_module = self.module(
+            model.model,
+            data.X)
+
 
 def list_assessments_exhaustive():
     """List all defined assessments"""

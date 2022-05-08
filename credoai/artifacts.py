@@ -336,35 +336,26 @@ class CredoGovernance:
 
 class CredoModel:
     """Class wrapper around model-to-be-assessed
-
     CredoModel serves as an adapter between arbitrary models
     and the assessments in CredoLens. Assessments depend
     on CredoModel instantiating certain methods. In turn,
     the methods an instance of CredoModel defines informs
     Lens which assessment can be automatically run.
-
     An assessment's required CredoModel functionality can be accessed
     using the `get_requirements` function of an assessment instance.
-
     The most generic way to interact with CredoModel is to pass a model_config:
     a dictionary where the key/value pairs reflect functions. This method is
     agnostic to framework. As long as the functions serve the needs of the
     assessments, they'll work.
-
     E.g. {'predict': model.predict}
-
     The model_config can also be inferred automatically, from well-known packages
     (call CredoModel.supported_frameworks for a list.) If supported, a model
     can be passed directly to CredoModel's "model" argument and a model_config
     will be inferred.
-
     Note a model or model_config *must* be passed. If both are passed, any 
     functionality specified in the model_config will overwrite and inferences
     made from the model itself.
-
     See the `quickstart notebooks <https://credoai-lens.readthedocs.io/en/stable/notebooks/quickstart.html#CredoModel>`_ for more information about usage
-
-
     Parameters
     ----------
     name : str
@@ -386,8 +377,11 @@ class CredoModel:
     ):
         self.name = name
         self.config = {}
+        self.model = model
+        self.framework = None
         assert model is not None or model_config is not None
-        if model is not None and model_config is None:
+        if model is not None:
+            self.framework = self._get_model_type(model)
             self._init_config(model)
         if model_config is not None:
             self.config.update(model_config)
@@ -404,10 +398,9 @@ class CredoModel:
 
     def _init_config(self, model):
         config = {}
-        framework = self._get_model_type(model)
-        if framework == 'sklearn':
+        if self.framework == 'sklearn':
             config = self._init_sklearn(model)
-        elif framework == 'xgboost':
+        elif self.framework == 'xgboost':
             config = self._init_xgboost(model)
         self.config = config
 
@@ -434,7 +427,7 @@ class CredoModel:
 
     def _get_model_type(self, model):
         try:
-            framework = model.__module__.split('.')[0]
+            framework = model.__class__.__module__.split('.')[0]
         except AttributeError:
             framework = None
         if framework in BASE_CONFIGS:

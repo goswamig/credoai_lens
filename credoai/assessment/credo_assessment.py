@@ -198,10 +198,10 @@ class CredoAssessment(ABC):
 class AssessmentRequirements:
     def __init__(self,
                  model_requirements=None,
-                 data_requirements=None):
+                 data_requirements=None,
+                 training_data_requirements=None):
         """
         Defines requirements for an assessment
-
         Parameters
         ------------
         requirements : List(Union[List, str])
@@ -213,11 +213,14 @@ class AssessmentRequirements:
         """
         self.model_requirements = model_requirements or []
         self.data_requirements = data_requirements or []
+        self.training_data_requirements = training_data_requirements or []
 
-    def check_requirements(self, credo_model=None, credo_data=None):
-        for artifact, requirements in \
-            [(credo_model, self.model_requirements),
-             (credo_data, self.data_requirements)]:
+    def check_requirements(self, credo_model=None, credo_data=None, credo_training_data=None):
+        for artifact, requirements in [
+            (credo_model, self.model_requirements),
+            (credo_data, self.data_requirements),
+            (credo_training_data, self.training_data_requirements)
+             ]:
             if artifact:
                 existing_keys = [k for k, v in artifact.__dict__.items()
                                  if v is not None]
@@ -236,4 +239,5 @@ class AssessmentRequirements:
 
     def get_requirements(self):
         return {'model_requirements': self.model_requirements,
-                'data_requirements': self.data_requirements}
+                'data_requirements': self.data_requirements,
+                'training_data_requirements': self.training_data_requirements}

@@ -396,7 +396,7 @@ class Lens:
             self._update_spec(self.spec, spec)
         # change spec based on overlap between different modules
         if 'Fairness' in spec and 'Performance' in spec:
-            spec['Performance']['ignore_sensitive'] = True
+            self.spec['Performance']['ignore_sensitive'] = True
 
 
 def set_logging_level(logging_level):

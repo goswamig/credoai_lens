@@ -12,6 +12,7 @@ base = 'credoai.modules'
 modules = [
     'dataset_modules.dataset_fairness',
     'dataset_modules.dataset_profiling',
+    'model_modules.explainability_shap',
     'model_modules.fairness_nlp',
     'model_modules.fairness_base',
     'model_modules.performance_base',
